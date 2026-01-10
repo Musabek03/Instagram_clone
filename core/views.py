@@ -1,13 +1,17 @@
 from django.shortcuts import render
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters,mixins
 from rest_framework.decorators import action
 from django.db.models import Count
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from .models import CustomUser, Post, PostLike, Comment, Notification
-from .serializers import PostSerializer, CommentSerializer, PostLikeSerializer,CustomUserListSerializer, CustomUserDetailSerializer,NotificationSerializer
-
+from .serializers import (PostSerializer, 
+                          CommentSerializer,PostLikeSerializer,CustomUserListSerializer,
+                          CustomUserDetailSerializer,FeedAuthorSerializer,FeedPostSerializer,
+                          NotificationSerializer
+                          )
 
 """Profiller ham baylanislar"""
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -94,6 +98,32 @@ class PostViewSet(viewsets.ModelViewSet):
     queryset = Post
     serializer_class = PostSerializer
     permission_classes = [IsAuthenticated]
+
+
+"""NewsFeed"""
+class FeedPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
+# generics.ListAPIView ornina  mixins.ListModelMixin, viewsets.GenericViewSet islettim. urls.py da router paydalana aliw ushin
+class FeedAPIView(mixins.ListModelMixin, viewsets.GenericViewSet):
+        serializer_class = FeedPostSerializer
+        permission_classes = [IsAuthenticated]
+        pagination_class = FeedPagination
+
+        def get_queryset(self):
+            user = self.request.user
+            following_users = user.following.all()
+            queryset = Post.objects.filter(author__in=following_users).select_related('author')\
+            .annotate(
+                likes_count = Count('likes', distinct=True), 
+                comments_count = Count('comments', distinct=True))\
+            .order_by('-created_at')
+
+            return queryset
+        
+
 
 
 
