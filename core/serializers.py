@@ -47,9 +47,17 @@ class FeedPostSerializer(serializers.ModelSerializer):
         return False
     
 
+class CommentSerializer(serializers.Serializer):
+    class Meta:
+        model = Comment
+        fields = ['id','user','text', 'created_at']
+        read_only_fields = ['created_at'] 
 
 
-
+class NotificationSerializer(serializers.Serializer):
+    class Meta:
+        model = Notification
+        fields = "__all__"
 
 class PostSerializer(serializers.Serializer):
     class Meta:
@@ -59,14 +67,4 @@ class PostSerializer(serializers.Serializer):
 class PostLikeSerializer(serializers.Serializer):
     class Meta:
         model = PostLike
-        fields = "__all__"
-
-class CommentSerializer(serializers.Serializer):
-    class Meta:
-        model = Comment
-        fields = "__all__"
-
-class NotificationSerializer(serializers.Serializer):
-    class Meta:
-        model = Notification
         fields = "__all__"

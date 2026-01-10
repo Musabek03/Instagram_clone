@@ -93,11 +93,75 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
 
-"""Postlar"""
+"""Postlar + Reakciyalar"""
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post
     serializer_class = PostSerializer
     permission_classes = [IsAuthenticated]
+
+    #Like basiw
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def like(self,request,pk=None):
+        post =self.get_object()
+        user = request.user
+
+        if post.likes.filter(id=user.id).exists():
+            post.likes.remove(user)
+            return Response({'status':'Unliked', 'likes_count':post.likes.count()})
+        else:
+            post.likes.add(user)
+
+        if post.author!=user:
+            Notification.objects.create(sender=user, receiver=post.author, type='like', post=post, is_read = False)
+
+        return Response({'status': 'liked', 'likes_count': post.likes.count()})
+    
+    #Like basqanlar dizimi
+    @action(detail=True, methods=['get'])
+    def likes(self,request, pk=None):
+        post = self.get_object()
+        users = post.likes.all()
+
+        page = self.paginate_queryset(users)
+        if page is not None:
+            serializer = CustomUserListSerializer(page,many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = CustomUserDetailSerializer(page,many=True)
+        return Response(serializer.data)
+    
+    #Comment jaziw
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def comment(self,request, pk=None):
+        post = self.get_object()
+        user = request.user 
+
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=user,post=post)
+        
+        if post.author != user:
+            Notification.objects.create(sender=user, receiver=post.author, type = 'comment', post=post, is_read=False)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    #Comment jazganlar dizimi
+    @action(detail=True, methods=['get'])
+    def comments(self,request,pk=None):
+        post = self.get_object()
+        comments = Comment.objects.filter(post=post).order_by('-created_at')
+
+        page = self.paginate_queryset(comments)
+        if page is not None:
+            serializer = CommentSerializer(page,many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = CommentSerializer(comments,many=True)
+        return Response(serializer.data)
+    
+    
+
 
 
 """NewsFeed"""
@@ -123,6 +187,8 @@ class FeedAPIView(mixins.ListModelMixin, viewsets.GenericViewSet):
 
             return queryset
         
+
+"""Reakciyalar"""
 
 
 
