@@ -2,10 +2,28 @@ from rest_framework import serializers
 from .models import CustomUser, Post, PostLike, Comment, Notification
 
 
-class CustomUserSerializer(serializers.Serializer):
+class CustomUserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = "__all__"
+        fields = ['id', 'username', 'avatar', 'first_name', 'last_name']
+
+# 2. Profil ushın (Detail) - Tolıq
+class CustomUSerDetailSerializer(serializers.ModelSerializer):
+    posts_count = serializers.IntegerField(read_only=True)
+    followers_count = serializers.IntegerField(read_only=True)
+    following_count = serializers.IntegerField(read_only=True)
+    is_following = serializers.SerializerMethodField()
+
+    class Meta:
+        fields = ['id','username', 'avatar', 'bio', 'website', 'posts_count', 'followers_count', 'following_count', 'is_following', 'created_at']
+    
+    def get_is_following(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.followers.filter(id=request.user.id).exists()
+        return False
+    
+
 
 class PostSerializer(serializers.Serializer):
     class Meta:
