@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .models import CustomUser, Post, PostLike, Comment, Notification
-
+from drf_spectacular.utils import extend_schema_field
+from .models import CustomUser, Post, Comment, Notification
 
 class CustomUserListSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,8 +15,10 @@ class CustomUserDetailSerializer(serializers.ModelSerializer):
     is_following = serializers.SerializerMethodField()
 
     class Meta:
+        model = CustomUser
         fields = ['id','username', 'avatar', 'bio', 'website', 'posts_count', 'followers_count', 'following_count', 'is_following', 'created_at']
-    
+
+    @extend_schema_field(serializers.BooleanField)
     def get_is_following(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -47,24 +49,53 @@ class FeedPostSerializer(serializers.ModelSerializer):
         return False
     
 
-class CommentSerializer(serializers.Serializer):
+class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['id','user','text', 'created_at']
         read_only_fields = ['created_at'] 
 
 
-class NotificationSerializer(serializers.Serializer):
+class NotificationSerializer(serializers.ModelSerializer):
+
+    sender = FeedAuthorSerializer(read_only=True)
+    post_image = serializers.SerializerMethodField()
+    message = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
-        fields = "__all__"
+        fields = ['id','sender','type','post_image','message', 'is_read', 'created_at']
 
-class PostSerializer(serializers.Serializer):
+    @extend_schema_field(serializers.CharField)
+    def get_post_image(self, obj):
+            if obj.post and obj.post.image:
+                return obj.post.image.url
+            return None    
+    
+    @extend_schema_field(serializers.CharField)
+    def get_message(self, obj):
+            if obj.type == 'like':
+                return f"{obj.sender.username} senin postina like basti"
+            elif obj.type == 'comment':
+                return f"{obj.sender.username} senin postina kommentariya jazdi"
+            elif obj.type == 'follow':
+                return f"{obj.sender.username} sagan follow etti"
+            return "Jana xabar"
+   
+class PostSerializer(serializers.ModelSerializer):
+    author = FeedAuthorSerializer(read_only=True) 
+    likes_count = serializers.IntegerField(source='likes.count', read_only=True)
+    comments_count = serializers.IntegerField(source='comments.count', read_only=True)
+    is_liked = serializers.SerializerMethodField()
+
     class Meta:
         model = Post
-        fields = "__all__"
+        fields = ['id', 'author', 'image', 'caption', 'created_at', 'likes_count', 'comments_count', 'is_liked']
+        read_only_fields = ['created_at']
 
-class PostLikeSerializer(serializers.Serializer):
-    class Meta:
-        model = PostLike
-        fields = "__all__"
+    @extend_schema_field(serializers.CharField)
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(id=request.user.id).exists()
+        return False

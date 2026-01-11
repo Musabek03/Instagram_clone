@@ -72,7 +72,7 @@ class Notification(models.Model):
     sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_notification')
     receiver = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='notifications')
     type = models.CharField(max_length=60,choices=CHOICES)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, null=True)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, null=True, blank=True)
     is_read = models.BooleanField()
     created_at = models.DateTimeField(auto_now_add=True)
 

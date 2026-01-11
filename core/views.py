@@ -3,14 +3,14 @@ from rest_framework import viewsets, filters,mixins
 from rest_framework.decorators import action
 from django.db.models import Count
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from .models import CustomUser, Post, PostLike, Comment, Notification
-from .serializers import (PostSerializer, 
-                          CommentSerializer,PostLikeSerializer,CustomUserListSerializer,
-                          CustomUserDetailSerializer,FeedAuthorSerializer,FeedPostSerializer,
-                          NotificationSerializer
+from .models import CustomUser, Post, Comment, Notification
+from .serializers import ( 
+                          CommentSerializer,CustomUserListSerializer,CustomUserDetailSerializer,
+                          PostSerializer,FeedPostSerializer,NotificationSerializer
                           )
 
 """Profiller ham baylanislar"""
@@ -81,7 +81,7 @@ class CustomUserViewSet(viewsets.ModelViewSet):
     #Following
     @action(detail=True, methods=['get'])
     def following(self,request, pk=None):
-        user = self.get_object
+        user = self.get_object()
         following_list = user.following.all()
 
         page = self.paginate_queryset(following_list)
@@ -95,9 +95,12 @@ class CustomUserViewSet(viewsets.ModelViewSet):
 
 """Postlar + Reakciyalar"""
 class PostViewSet(viewsets.ModelViewSet):
-    queryset = Post
+    queryset = Post.objects.all().order_by('-created_at')
     serializer_class = PostSerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
 
     #Like basiw
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
@@ -110,9 +113,6 @@ class PostViewSet(viewsets.ModelViewSet):
             return Response({'status':'Unliked', 'likes_count':post.likes.count()})
         else:
             post.likes.add(user)
-
-        if post.author!=user:
-            Notification.objects.create(sender=user, receiver=post.author, type='like', post=post, is_read = False)
 
         return Response({'status': 'liked', 'likes_count': post.likes.count()})
     
@@ -135,13 +135,10 @@ class PostViewSet(viewsets.ModelViewSet):
     def comment(self,request, pk=None):
         post = self.get_object()
         user = request.user 
-
         serializer = CommentSerializer(data=request.data)
+
         if serializer.is_valid():
             serializer.save(user=user,post=post)
-        
-        if post.author != user:
-            Notification.objects.create(sender=user, receiver=post.author, type = 'comment', post=post, is_read=False)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -159,9 +156,6 @@ class PostViewSet(viewsets.ModelViewSet):
         
         serializer = CommentSerializer(comments,many=True)
         return Response(serializer.data)
-    
-    
-
 
 
 """NewsFeed"""
@@ -188,7 +182,14 @@ class FeedAPIView(mixins.ListModelMixin, viewsets.GenericViewSet):
             return queryset
         
 
-"""Reakciyalar"""
+"""Notifications"""
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(receiver=self.request.user).order_by('-created_at')
+    
 
 
 
